@@ -12,7 +12,7 @@
             padding: 0;
         }
         .container {
-            max-width: 460px;
+            max-width: 480px;
             margin: 40px auto;
             background: #fff;
             padding: 32px 28px;
@@ -39,6 +39,10 @@
             border: 1px solid #ddd;
             font-size: 15px;
         }
+        select:focus, button:focus {
+            outline: 3px solid #2d98da;
+            outline-offset: 2px;
+        }
         button {
             background: #2d98da;
             color: #fff;
@@ -47,13 +51,38 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        button:hover {
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button:hover:enabled {
             background: #3867d6;
+        }
+        .swap-btn {
+            width: auto;
+            padding: 8px 18px;
+            margin: 10px 0 18px 0;
+            background: #e1e1e1;
+            color: #25396f;
+            border: 1px solid #bbb;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .swap-btn:hover {
+            background: #d2d2d2;
         }
         .result, .loading {
             text-align: center;
             margin-top: 20px;
             font-size: 1.08em;
+        }
+        .result[aria-live] {
+            min-height: 4em;
+            display: block;
         }
         .loading {
             color: #3867d6;
@@ -73,6 +102,10 @@
             margin: 0;
             padding-left: 20px;
         }
+        .places li a {
+            color: #2d98da;
+            text-decoration: underline;
+        }
         @media (max-width: 600px) {
             .container {
                 padding: 18px 5px;
@@ -84,15 +117,22 @@
 <body>
     <div class="container">
         <h2>Travel Time & Cost Calculator</h2>
-        <form id="travelForm">
+        <form id="travelForm" autocomplete="off">
             <label for="startCity">Starting City</label>
-            <select id="startCity" aria-label="Select starting city"></select>
+            <select id="startCity" aria-label="Select starting city">
+                <option value="" disabled selected>Select starting city</option>
+            </select>
+
+            <button type="button" id="swapBtn" class="swap-btn" aria-label="Swap cities">&#8646; Swap</button>
 
             <label for="destCity">Destination City</label>
-            <select id="destCity" aria-label="Select destination city"></select>
+            <select id="destCity" aria-label="Select destination city">
+                <option value="" disabled selected>Select destination city</option>
+            </select>
 
             <label for="mode">Mode of Transport</label>
             <select id="mode" aria-label="Select mode of transport">
+                <option value="" disabled selected>Select mode</option>
                 <option value="car">Car</option>
                 <option value="bus">Bus</option>
                 <option value="train">Train</option>
@@ -115,11 +155,11 @@
                     <option value="general">General</option>
                 </select>
             </div>
-            <button type="submit">Calculate</button>
+            <button type="submit" id="calcBtn">Calculate</button>
             <button type="button" id="resetBtn" style="background:#888; margin-top:-10px;">Reset</button>
         </form>
         <div class="loading" id="loading" style="display:none;">Calculating...</div>
-        <div class="result" id="result"></div>
+        <div class="result" id="result" aria-live="polite"></div>
         <div class="places" id="placesSection" style="display:none;">
             <h3>Suggested Places to Visit</h3>
             <ul id="placesList"></ul>
@@ -185,36 +225,38 @@
         const placesSection = document.getElementById('placesSection');
         const placesList = document.getElementById('placesList');
         const resetBtn = document.getElementById('resetBtn');
+        const swapBtn = document.getElementById('swapBtn');
+        const calcBtn = document.getElementById('calcBtn');
 
         // --- Helper Functions ---
         function getCityList() {
-            // Sorted for nice UI
             return Object.keys(distanceData.cities).sort();
         }
 
         function populateCitySelects() {
             const cities = getCityList();
-            startCitySelect.innerHTML = '';
+            // Populate start city
+            startCitySelect.innerHTML = '<option value="" disabled selected>Select starting city</option>';
             cities.forEach(city => {
                 const opt = document.createElement('option');
                 opt.value = city;
                 opt.textContent = city;
                 startCitySelect.appendChild(opt);
             });
-            // Populate destination based on first city
+            // Populate destination city
             updateDestCities();
         }
 
-        function updateDestCities() {
+        function updateDestCities(selectedDest) {
             const cities = getCityList();
             const startCity = startCitySelect.value;
-            destCitySelect.innerHTML = '';
-            destCitySelect.appendChild(new Option('Select destination', '', true, true)); // Placeholder
+            destCitySelect.innerHTML = '<option value="" disabled selected>Select destination city</option>';
             cities.forEach(city => {
                 if (city !== startCity) {
                     const opt = document.createElement('option');
                     opt.value = city;
                     opt.textContent = city;
+                    if (selectedDest && city === selectedDest) opt.selected = true;
                     destCitySelect.appendChild(opt);
                 }
             });
@@ -242,7 +284,7 @@
                 placesList.innerHTML = '';
                 places.forEach(place => {
                     const li = document.createElement('li');
-                    li.textContent = place;
+                    li.innerHTML = `<a href="suggested-places.html?city=${encodeURIComponent(city)}" target="_blank" rel="noopener">${place}</a>`;
                     placesList.appendChild(li);
                 });
                 placesSection.style.display = '';
@@ -258,22 +300,22 @@
             trainClassSelect.selectedIndex = 0;
             busClassDiv.style.display = 'none';
             trainClassDiv.style.display = 'none';
-            resultDiv.innerHTML = '';
+            resultDiv.textContent = '';
             loadingDiv.style.display = 'none';
             placesSection.style.display = 'none';
         }
 
         // --- Event Listeners ---
-
         startCitySelect.addEventListener('change', () => {
             updateDestCities();
-            resultDiv.innerHTML = '';
+            resultDiv.textContent = '';
             placesSection.style.display = 'none';
         });
 
         destCitySelect.addEventListener('change', () => {
-            showSuggestedPlaces(destCitySelect.value);
-            resultDiv.innerHTML = '';
+            if (destCitySelect.value) showSuggestedPlaces(destCitySelect.value);
+            else placesSection.style.display = 'none';
+            resultDiv.textContent = '';
         });
 
         modeSelect.addEventListener('change', updateClassOptions);
@@ -283,10 +325,21 @@
             resetForm();
         });
 
+        swapBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Swap values if both are selected
+            const start = startCitySelect.value;
+            const dest = destCitySelect.value;
+            if (start && dest) {
+                startCitySelect.value = dest;
+                updateDestCities(start); // preselect previous start as destination
+            }
+        });
+
         // --- Main Calculation ---
         document.getElementById('travelForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            resultDiv.innerHTML = '';
+            resultDiv.textContent = '';
             placesSection.style.display = 'none';
 
             const startCity = startCitySelect.value;
@@ -301,6 +354,10 @@
             }
             if (startCity === destCity) {
                 resultDiv.innerHTML = '<span style="color:#e55039;">Starting and destination cities cannot be the same.</span>';
+                return;
+            }
+            if (!mode) {
+                resultDiv.innerHTML = '<span style="color:#e55039;">Please select a mode of transport.</span>';
                 return;
             }
 
@@ -323,9 +380,11 @@
             }
 
             // Simulate loading
+            calcBtn.disabled = true;
             loadingDiv.style.display = '';
             setTimeout(() => {
                 loadingDiv.style.display = 'none';
+                calcBtn.disabled = false;
                 const timeHrs = distance / speed;
                 const cost = distance * costPerKm;
 

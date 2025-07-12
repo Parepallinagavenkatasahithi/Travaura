@@ -192,12 +192,11 @@
         });
 
         // Contact form logic (demo only)
-        document.getElementById('contactForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            alert('Message sent (demo only).');
-            this.reset();
-            showSection('home');
-        });
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    alert('Demo only. No real login.'); 
+    window.location.href = "main.html";  // Redirect to main.html after login
+});
     });
        
 
